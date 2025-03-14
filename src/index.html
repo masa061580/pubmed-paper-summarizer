@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      background-color: #f8f8f8;
+      font-size: 14px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #336699;
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    h2 {
+      color: #336699;
+      margin-top: 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    /* タブスタイル - Pubmed風 */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tablink {
+      background: #f5f5f5;
+      border: none;
+      display: grid;
+      place-items: center;    /* 垂直・水平方向の両方を中央に */
+      height: 40px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      flex-grow: 1;
+      text-align: center;
+      border-top-left-radius: 4px;
+      border-top-right-radius: 4px;
+      margin-bottom: -1px;
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .tablink:hover {
+      background-color: #e8e8e8;
+    }
+
+    .tablink.active {
+      background: #336699;
+      color: white;
+      border-bottom: 1px solid #336699;
+    }
+
+    .tabcontent {
+      display: none;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-top: none;
+      border-bottom-left-radius: 4px;
+      border-bottom-right-radius: 4px;
+      animation: fadeEffect 0.5s;
+    }
+
+    .tabcontent.active {
+      display: block;
+    }
+
+    @keyframes fadeEffect {
+      from {opacity: 0;}
+      to {opacity: 1;}
+    }
+
+    /* フォームスタイル */
+    .form-group {
+      margin-bottom: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group label {
+      min-width: 120px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    input[type="text"], 
+    input[type="number"], 
+    input[type="email"],
+    input[type="password"],
+    select {
+      height: 32px;           /* 直接高さを指定 */
+      line-height: 32px;      /* テキストの行の高さを指定 */
+      padding: 0 10px;        /* 上下のパディングを0に、左右に10px */
+      box-sizing: border-box; /* パディングとボーダーを高さに含める */
+      /* padding: 8px; */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      flex-grow: 1;
+      min-width: 200px;
+      font-size: 14px;
+    }
+
+    button {
+      display: grid;
+      place-items: center;
+      height: 36px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    button.action {
+      font-size: 16px;
+      padding: 10px 20px;
+      background: #336699;
+      margin-top: 20px;
+      font-weight: 500;
+    }
+
+    button.action:hover {
+      background: #264d73;
+    }
+
+    /* 検索用語リスト */
+    #search-terms-container {
+      margin-bottom: 20px;
+    }
+
+    .search-term-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: center;
+      padding: 12px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      border-left: 4px solid #336699;
+    }
+
+    .search-term-item input[type="text"] {
+      flex-grow: 3;
+    }
+
+    .search-term-item input[type="number"] {
+      flex-grow: 1;
+      max-width: 80px;
+    }
+
+    .search-term-item button {
+      background-color: #d9534f;
+      padding: 8px 12px;
+      font-size: 14px;
+      min-width: 60px;
+    }
+
+    .search-term-item button:hover {
+      background-color: #c9302c;
+    }
+
+    /* ステータスメッセージ */
+    .status-message {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .status-message.success {
+      background-color: #dff0d8;
+      color: #3c763d;
+      display: block;
+    }
+
+    .status-message.error {
+      background-color: #f2dede;
+      color: #a94442;
+      display: block;
+    }
+
+    .status-message.info {
+      background-color: #d9edf7;
+      color: #31708f;
+      display: block;
+    }
+
+    /* 情報テキスト */
+    .info-text {
+      background-color: #d9edf7;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 15px 0;
+      font-size: 14px;
+    }
+
+    /* 実行ボタンコンテナ */
+    .action-buttons {
+      text-align: center;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+
+    /* 現在のスケジュール表示 */
+    #current-schedule {
+      margin: 15px 0;
+      padding: 12px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+      border-left: 4px solid #336699;
+      font-size: 14px;
+    }
+
+    /* レスポンシブデザイン */
+    @media (max-width: 600px) {
+      .form-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .form-group label {
+        margin-bottom: 5px;
+      }
+      
+      .search-term-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .search-term-item input, 
+      .search-term-item button {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+      
+      .tablink {
+        flex-basis: 50%;
+      }
+    }
+  </style>
+  <script>
+    // グローバル変数
+    var searchTerms = <?!= JSON.stringify(getSearchTerms()); ?>;
+    var settings = <?!= JSON.stringify(getSettings()); ?>;
+    var currentTrigger = <?!= JSON.stringify(getCurrentTrigger()); ?>;
+  </script>
+  <title>Pubmed論文自動要約アプリ</title>
+</head>
+<body>
+  <div class="container">
+    <h1>Pubmed論文自動要約アプリ</h1>
+    
+    <!-- タブメニュー -->
+    <div class="tabs">
+      <button class="tablink active" onclick="openTab(event, 'search-tab')">検索設定</button>
+      <button class="tablink" onclick="openTab(event, 'email-tab')">メール設定</button>
+      <button class="tablink" onclick="openTab(event, 'api-tab')">API設定</button>
+      <button class="tablink" onclick="openTab(event, 'schedule-tab')">スケジュール</button>
+    </div>
+    
+    <!-- 検索設定タブ -->
+    <div id="search-tab" class="tabcontent active">
+      <h2>検索用語設定</h2>
+      <p>Pubmedで検索する用語と、各検索で取得する最大論文数を設定します。</p>
+      
+      <!-- 検索用語リスト -->
+      <div id="search-terms-container">
+        <!-- 検索用語がJSで動的に追加される -->
+      </div>
+      
+      <!-- 新規検索用語追加フォーム -->
+      <div class="form-group">
+        <input type="text" id="new-search-term" placeholder="検索用語">
+        <input type="number" id="new-max-results" value="10" min="1" max="100" placeholder="最大件数">
+        <button onclick="addSearchTerm()">追加</button>
+      </div>
+      
+      <div class="info-text">
+        <strong>ヒント:</strong> 複数のキーワードを AND/OR で組み合わせることができます (例: "cancer AND therapy")
+      </div>
+    </div>
+    
+    <!-- メール設定タブ -->
+    <div id="email-tab" class="tabcontent">
+      <h2>メール設定</h2>
+      <p>検索結果を送信するメールアドレスを設定します。</p>
+      
+      <div class="form-group">
+        <label for="email">メールアドレス:</label>
+        <input type="email" id="email" placeholder="example@gmail.com" value="">
+      </div>
+      
+      <button onclick="saveEmailSetting()">保存</button>
+      <div id="email-status" class="status-message"></div>
+    </div>
+    
+    <!-- API設定タブ -->
+    <div id="api-tab" class="tabcontent">
+      <h2>API設定</h2>
+      <p>アブストラクト要約に使用するClaude APIキーを設定します。</p>
+      
+      <div class="form-group">
+        <label for="claude-api-key">Claude APIキー:</label>
+        <input type="password" id="claude-api-key" placeholder="sk-..." value="">
+        <button type="button" onclick="toggleApiKeyVisibility()">表示/非表示</button>
+      </div>
+      
+      <div class="info-text">
+        <strong>注意:</strong> APIキーは <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> から取得できます。
+      </div>
+      
+      <button onclick="saveApiSetting()">保存</button>
+      <div id="api-status" class="status-message"></div>
+    </div>
+    
+    <!-- スケジュールタブ -->
+    <div id="schedule-tab" class="tabcontent">
+      <h2>実行スケジュール</h2>
+      <p>検索を自動実行する曜日と時間を設定します。</p>
+      
+      <div class="form-group">
+        <label for="day-of-week">曜日:</label>
+        <select id="day-of-week">
+          <option value="1">月曜日</option>
+          <option value="2">火曜日</option>
+          <option value="3">水曜日</option>
+          <option value="4">木曜日</option>
+          <option value="5">金曜日</option>
+          <option value="6">土曜日</option>
+          <option value="7">日曜日</option>
+        </select>
+        
+        <label for="hour">時間:</label>
+        <select id="hour">
+          <option value="0">0時</option>
+          <option value="1">1時</option>
+          <option value="2">2時</option>
+          <option value="3">3時</option>
+          <option value="4">4時</option>
+          <option value="5">5時</option>
+          <option value="6">6時</option>
+          <option value="7">7時</option>
+          <option value="8">8時</option>
+          <option value="9">9時</option>
+          <option value="10">10時</option>
+          <option value="11">11時</option>
+          <option value="12">12時</option>
+          <option value="13">13時</option>
+          <option value="14">14時</option>
+          <option value="15">15時</option>
+          <option value="16">16時</option>
+          <option value="17">17時</option>
+          <option value="18">18時</option>
+          <option value="19">19時</option>
+          <option value="20">20時</option>
+          <option value="21">21時</option>
+          <option value="22">22時</option>
+          <option value="23">23時</option>
+        </select>
+      </div>
+      
+      <div id="current-schedule">
+        <!-- 現在のスケジュール情報がJSで動的に追加される -->
+      </div>
+      
+      <button onclick="setSchedule()">スケジュール設定</button>
+      <button onclick="deleteSchedule()">スケジュール解除</button>
+      <div id="schedule-status" class="status-message"></div>
+    </div>
+    
+    <!-- 実行ボタン -->
+    <div class="action-buttons">
+      <button class="action" onclick="runSearchNow()">今すぐ検索実行</button>
+      <div id="run-status" class="status-message"></div>
+    </div>
+  </div>
+  
+  <script>
+    // タブの切り替え
+    function openTab(evt, tabId) {
+      // すべてのタブコンテンツを非表示
+      var tabcontents = document.getElementsByClassName("tabcontent");
+      for (var i = 0; i < tabcontents.length; i++) {
+        tabcontents[i].classList.remove("active");
+      }
+      
+      // すべてのタブリンクの active クラスを削除
+      var tablinks = document.getElementsByClassName("tablink");
+      for (var i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove("active");
+      }
+      
+      // クリックされたタブのコンテンツを表示し、タブリンクをアクティブに
+      document.getElementById(tabId).classList.add("active");
+      evt.currentTarget.classList.add("active");
+    }
+
+    // 検索用語リストの表示を更新
+    function renderSearchTerms() {
+      var container = document.getElementById('search-terms-container');
+      container.innerHTML = '';
+      
+      if (!searchTerms || searchTerms.length === 0) {
+        container.innerHTML = '<div class="info-text">検索用語が設定されていません。下のフォームから追加してください。</div>';
+        return;
+      }
+      
+      console.log("Rendering search terms:", JSON.stringify(searchTerms));
+      
+      for (var i = 0; i < searchTerms.length; i++) {
+        var term = searchTerms[i];
+        if (!term) continue; // undefined または null の項目をスキップ
+        
+        var termValue = term.term || '';
+        var maxResultsValue = term.maxResults || 10;
+        
+        var div = document.createElement('div');
+        div.className = 'search-term-item';
+        div.innerHTML = `
+          <input type="text" value="${termValue}" onchange="updateSearchTerm(${i}, this.value, ${maxResultsValue})">
+          <input type="number" value="${maxResultsValue}" min="1" max="100" onchange="updateSearchTerm(${i}, '${termValue}', this.value)">
+          <button onclick="deleteSearchTerm(${i})">削除</button>
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    // 検索用語を追加
+    function addSearchTerm() {
+      var termInput = document.getElementById('new-search-term');
+      var maxResultsInput = document.getElementById('new-max-results');
+      
+      var term = termInput.value.trim();
+      var maxResults = parseInt(maxResultsInput.value, 10) || 10;
+      
+      if (!term) {
+        showMessage('run-status', '検索用語を入力してください', 'error');
+        return;
+      }
+      
+      showMessage('run-status', '検索用語を追加中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log("Search terms after adding:", JSON.stringify(result));
+          searchTerms = result;
+          renderSearchTerms();
+          termInput.value = '';
+          maxResultsInput.value = '10';
+          showMessage('run-status', '検索用語を追加しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          console.error("Error adding search term:", error);
+          showMessage('run-status', 'エラー: ' + error, 'error');
+        })
+        .saveSearchTerm(term, maxResults);
+    }
+
+    // 検索用語を更新
+    function updateSearchTerm(index, term, maxResults) {
+      term = term.trim();
+      maxResults = parseInt(maxResults, 10) || 10;
+      
+      if (!term) {
+        showMessage('run-status', '検索用語は空にできません', 'error');
+        renderSearchTerms(); // 元の状態に戻す
+        return;
+      }
+      
+      showMessage('run-status', '検索用語を更新中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log("Search terms after updating:", JSON.stringify(result));
+          searchTerms = result;
+          renderSearchTerms();
+          showMessage('run-status', '検索用語を更新しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          console.error("Error updating search term:", error);
+          showMessage('run-status', 'エラー: ' + error, 'error');
+          renderSearchTerms(); // 元の状態に戻す
+        })
+        .updateSearchTerm(index, term, maxResults);
+    }
+
+    // 検索用語を削除
+    function deleteSearchTerm(index) {
+      if (!confirm('この検索用語を削除してもよろしいですか？')) {
+        return;
+      }
+      
+      showMessage('run-status', '検索用語を削除中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log("Search terms after deleting:", JSON.stringify(result));
+          searchTerms = result;
+          renderSearchTerms();
+          showMessage('run-status', '検索用語を削除しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          console.error("Error deleting search term:", error);
+          showMessage('run-status', 'エラー: ' + error, 'error');
+        })
+        .deleteSearchTerm(index);
+    }
+
+    // メール設定を保存
+    function saveEmailSetting() {
+      var email = document.getElementById('email').value.trim();
+      
+      if (!email) {
+        showMessage('email-status', 'メールアドレスを入力してください', 'error');
+        return;
+      }
+      
+      if (!validateEmail(email)) {
+        showMessage('email-status', '有効なメールアドレスを入力してください', 'error');
+        return;
+      }
+      
+      showMessage('email-status', 'メールアドレスを保存中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          settings = result;
+          showMessage('email-status', 'メールアドレスを保存しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          showMessage('email-status', 'エラー: ' + error, 'error');
+        })
+        .saveSettings({email: email});
+    }
+
+    // メールアドレスのバリデーション
+    function validateEmail(email) {
+      var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
+    }
+
+    // APIキー設定を保存
+    function saveApiSetting() {
+      var apiKey = document.getElementById('claude-api-key').value.trim();
+      
+      if (!apiKey) {
+        showMessage('api-status', 'APIキーを入力してください', 'error');
+        return;
+      }
+      
+      if (!apiKey.startsWith('sk-')) {
+        showMessage('api-status', 'APIキーの形式が正しくありません', 'error');
+        return;
+      }
+      
+      showMessage('api-status', 'APIキーを保存中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          settings = result;
+          showMessage('api-status', 'APIキーを保存しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          showMessage('api-status', 'エラー: ' + error, 'error');
+        })
+        .saveSettings({claudeApiKey: apiKey});
+    }
+
+    // APIキーの表示/非表示を切り替え
+    function toggleApiKeyVisibility() {
+      var apiKeyInput = document.getElementById('claude-api-key');
+      if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+      } else {
+        apiKeyInput.type = 'password';
+      }
+    }
+
+    // スケジュールを設定
+    function setSchedule() {
+      var dayOfWeek = parseInt(document.getElementById('day-of-week').value, 10);
+      var hour = parseInt(document.getElementById('hour').value, 10);
+      
+      showMessage('schedule-status', 'スケジュールを設定中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showMessage('schedule-status', result, 'success');
+          loadCurrentTrigger();
+        })
+        .withFailureHandler(function(error) {
+          showMessage('schedule-status', 'エラー: ' + error, 'error');
+        })
+        .setWeeklyTrigger(dayOfWeek, hour);
+    }
+
+    // スケジュールを解除
+    function deleteSchedule() {
+      if (!confirm('スケジュールを解除してもよろしいですか？')) {
+        return;
+      }
+      
+      showMessage('schedule-status', 'スケジュールを解除中...', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function() {
+          showMessage('schedule-status', 'スケジュールを解除しました', 'success');
+          loadCurrentTrigger();
+        })
+        .withFailureHandler(function(error) {
+          showMessage('schedule-status', 'エラー: ' + error, 'error');
+        })
+        .deleteTriggers();
+    }
+
+    // 現在のトリガー設定を取得
+    function loadCurrentTrigger() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          currentTrigger = result;
+          renderCurrentTrigger();
+        })
+        .getCurrentTrigger();
+    }
+
+    // 現在のトリガー設定を表示
+    function renderCurrentTrigger() {
+      var container = document.getElementById('current-schedule');
+      
+      if (currentTrigger.exists) {
+        var dayNames = ['', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
+        var dayName = dayNames[currentTrigger.dayOfWeek] || '';
+        
+        container.innerHTML = `
+          <strong>現在の設定:</strong> 毎週${dayName} ${currentTrigger.hour}時に自動実行
+        `;
+        
+        // セレクトボックスの値を現在の設定に合わせる
+        document.getElementById('day-of-week').value = currentTrigger.dayOfWeek;
+        document.getElementById('hour').value = currentTrigger.hour;
+      } else {
+        container.innerHTML = '<strong>現在の設定:</strong> スケジュール未設定';
+      }
+    }
+
+    // 検索を今すぐ実行
+    function runSearchNow() {
+      // 設定確認
+      if (!searchTerms || searchTerms.length === 0) {
+        showMessage('run-status', '検索用語が設定されていません', 'error');
+        return;
+      }
+      
+      if (!settings.email || !settings.claudeApiKey) {
+        showMessage('run-status', 'メールアドレスとAPIキーを設定してください', 'error');
+        return;
+      }
+      
+      if (!confirm('検索を実行しますか？\n\n※処理には時間がかかる場合があります。')) {
+        return;
+      }
+      
+      showMessage('run-status', '検索を実行中...しばらくお待ちください', 'info');
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('run-status', result.message, 'success');
+          } else {
+            showMessage('run-status', '実行エラー: ' + result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('run-status', 'エラー: ' + error, 'error');
+        })
+        .runSearch();
+    }
+
+    // ステータスメッセージを表示
+    function showMessage(elementId, message, type) {
+      var element = document.getElementById(elementId);
+      element.textContent = message;
+      element.className = 'status-message ' + type;
+      
+      // 成功メッセージは5秒後に消える
+      if (type === 'success') {
+        setTimeout(function() {
+          element.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    // デバッグ用関数
+    function logSearchTerms() {
+      console.log("Current search terms:", JSON.stringify(searchTerms));
+    }
+
+    // 初期化
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("Initial search terms:", JSON.stringify(searchTerms));
+      
+      // 検索用語リストの表示
+      renderSearchTerms();
+      
+      // 設定値の表示
+      if (settings && settings.email) {
+        document.getElementById('email').value = settings.email;
+      }
+      
+      if (settings && settings.claudeApiKey) {
+        document.getElementById('claude-api-key').value = settings.claudeApiKey;
+      }
+      
+      // 現在のトリガー設定を表示
+      renderCurrentTrigger();
+    });
+  </script>
+</body>
+</html>

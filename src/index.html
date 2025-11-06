@@ -50,9 +50,11 @@
     .tablink {
       background: #f5f5f5;
       border: none;
-      display: grid;
-      place-items: center;    /* 垂直・水平方向の両方を中央に */
+      display: flex;
+      align-items: center;
+      justify-content: center;
       height: 40px;
+      padding: 0 15px;
       cursor: pointer;
       transition: background-color 0.3s;
       flex-grow: 1;
@@ -130,9 +132,11 @@
     }
 
     button {
-      display: grid;
-      place-items: center;
-      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 8px 16px;
       background: #4CAF50;
       color: white;
       border: none;
@@ -141,6 +145,7 @@
       transition: background-color 0.3s;
       font-size: 14px;
       font-weight: 500;
+      white-space: nowrap;
     }
 
     button:hover {
@@ -149,10 +154,11 @@
 
     button.action {
       font-size: 16px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       background: #336699;
       margin-top: 20px;
       font-weight: 500;
+      width: auto;
     }
 
     button.action:hover {
@@ -189,6 +195,7 @@
       padding: 8px 12px;
       font-size: 14px;
       min-width: 60px;
+      flex-shrink: 0;
     }
 
     .search-term-item button:hover {

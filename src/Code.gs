@@ -480,25 +480,52 @@ function summarizeWithGemini(abstract) {
 
   try {
     const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
 
-    if (response.getResponseCode() !== 200) {
-      Logger.log("Gemini API エラー: " + response.getContentText());
-      return "要約APIエラー";
+    // ステータスコードを詳細にログ
+    Logger.log("Gemini API ステータスコード: " + responseCode);
+
+    if (responseCode !== 200) {
+      Logger.log("Gemini API エラーレスポンス: " + responseText);
+      return "要約APIエラー (HTTP " + responseCode + ")";
     }
 
-    const data = JSON.parse(response.getContentText());
+    const data = JSON.parse(responseText);
 
-    if (data.candidates && data.candidates.length > 0 &&
-        data.candidates[0].content && data.candidates[0].content.parts &&
-        data.candidates[0].content.parts.length > 0) {
-      return data.candidates[0].content.parts[0].text || "要約できませんでした";
-    } else {
-      Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
-      return "要約できませんでした";
+    // レスポンス全体をログに記録（デバッグ用）
+    Logger.log("Gemini API レスポンス: " + JSON.stringify(data));
+
+    // セーフティフィルタでブロックされた場合のチェック
+    if (data.candidates && data.candidates.length > 0) {
+      const candidate = data.candidates[0];
+
+      // finishReasonをチェック
+      if (candidate.finishReason && candidate.finishReason !== "STOP") {
+        Logger.log("Gemini API 終了理由: " + candidate.finishReason);
+        if (candidate.finishReason === "SAFETY") {
+          return "セーフティフィルタによりブロックされました";
+        }
+        return "生成が完了しませんでした (" + candidate.finishReason + ")";
+      }
+
+      // 通常のレスポンス処理
+      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        const text = candidate.content.parts[0].text;
+        if (text && text.trim() !== "") {
+          return text;
+        }
+      }
     }
+
+    // candidates が空または存在しない場合
+    Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
+    return "要約できませんでした（レスポンスが空です）";
+
   } catch (e) {
     Logger.log("Gemini API例外: " + e.toString());
-    return "要約処理エラー";
+    Logger.log("スタックトレース: " + e.stack);
+    return "要約処理エラー: " + e.message;
   }
 }
 
@@ -881,37 +908,65 @@ PubMed検索式:`;
 
   try {
     const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
 
-    if (response.getResponseCode() !== 200) {
-      Logger.log("Gemini API エラー: " + response.getContentText());
+    Logger.log("Gemini API (検索式生成) ステータスコード: " + responseCode);
+
+    if (responseCode !== 200) {
+      Logger.log("Gemini API エラーレスポンス: " + responseText);
       return {
         success: false,
-        message: "Gemini APIエラー"
+        message: "Gemini APIエラー (HTTP " + responseCode + ")"
       };
     }
 
-    const data = JSON.parse(response.getContentText());
+    const data = JSON.parse(responseText);
+    Logger.log("Gemini API (検索式生成) レスポンス: " + JSON.stringify(data));
 
-    if (data.candidates && data.candidates.length > 0 &&
-        data.candidates[0].content && data.candidates[0].content.parts &&
-        data.candidates[0].content.parts.length > 0) {
-      const generatedQuery = data.candidates[0].content.parts[0].text.trim();
-      return {
-        success: true,
-        query: generatedQuery
-      };
-    } else {
-      Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
-      return {
-        success: false,
-        message: "検索式を生成できませんでした"
-      };
+    // セーフティフィルタでブロックされた場合のチェック
+    if (data.candidates && data.candidates.length > 0) {
+      const candidate = data.candidates[0];
+
+      // finishReasonをチェック
+      if (candidate.finishReason && candidate.finishReason !== "STOP") {
+        Logger.log("Gemini API 終了理由: " + candidate.finishReason);
+        if (candidate.finishReason === "SAFETY") {
+          return {
+            success: false,
+            message: "セーフティフィルタによりブロックされました"
+          };
+        }
+        return {
+          success: false,
+          message: "生成が完了しませんでした (" + candidate.finishReason + ")"
+        };
+      }
+
+      // 通常のレスポンス処理
+      if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+        const text = candidate.content.parts[0].text;
+        if (text && text.trim() !== "") {
+          return {
+            success: true,
+            query: text.trim()
+          };
+        }
+      }
     }
-  } catch (e) {
-    Logger.log("Gemini API例外: " + e.toString());
+
+    Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
     return {
       success: false,
-      message: "検索式生成エラー: " + e.toString()
+      message: "検索式を生成できませんでした（レスポンスが空です）"
+    };
+
+  } catch (e) {
+    Logger.log("Gemini API例外: " + e.toString());
+    Logger.log("スタックトレース: " + e.stack);
+    return {
+      success: false,
+      message: "検索式生成エラー: " + e.message
     };
   }
 }

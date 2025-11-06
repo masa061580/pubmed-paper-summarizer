@@ -410,16 +410,21 @@ function getPublicationDate(article) {
   try {
     const journalElement = article.getChild("Journal");
     if (!journalElement) return "";
-    
-    const pubDateElement = journalElement.getChild("JournalIssue")
-      ?.getChild("PubDate");
-      
+
+    const journalIssue = journalElement.getChild("JournalIssue");
+    if (!journalIssue) return "";
+
+    const pubDateElement = journalIssue.getChild("PubDate");
     if (!pubDateElement) return "";
-    
-    const year = pubDateElement.getChild("Year")?.getText() || "";
-    const month = pubDateElement.getChild("Month")?.getText() || "";
-    const day = pubDateElement.getChild("Day")?.getText() || "";
-    
+
+    const yearElement = pubDateElement.getChild("Year");
+    const monthElement = pubDateElement.getChild("Month");
+    const dayElement = pubDateElement.getChild("Day");
+
+    const year = yearElement ? yearElement.getText() : "";
+    const month = monthElement ? monthElement.getText() : "";
+    const day = dayElement ? dayElement.getText() : "";
+
     if (year && month && day) {
       return year + "-" + month + "-" + day;
     } else if (year && month) {

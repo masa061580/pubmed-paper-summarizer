@@ -282,11 +282,11 @@
     var settings = <?!= JSON.stringify(getSettings()); ?>;
     var currentTrigger = <?!= JSON.stringify(getCurrentTrigger()); ?>;
   </script>
-  <title>Pubmed論文自動要約アプリ</title>
+  <title>Pubmed論文自動要約アプリ (Gemini版)</title>
 </head>
 <body>
   <div class="container">
-    <h1>Pubmed論文自動要約アプリ</h1>
+    <h1>Pubmed論文自動要約アプリ (Gemini版)</h1>
     
     <!-- タブメニュー -->
     <div class="tabs">
@@ -335,18 +335,18 @@
     <!-- API設定タブ -->
     <div id="api-tab" class="tabcontent">
       <h2>API設定</h2>
-      <p>アブストラクト要約に使用するClaude APIキーを設定します。</p>
-      
+      <p>アブストラクト要約に使用するGemini APIキーを設定します。</p>
+
       <div class="form-group">
-        <label for="claude-api-key">Claude APIキー:</label>
-        <input type="password" id="claude-api-key" placeholder="sk-..." value="">
+        <label for="gemini-api-key">Gemini APIキー:</label>
+        <input type="password" id="gemini-api-key" placeholder="AIzaSy..." value="">
         <button type="button" onclick="toggleApiKeyVisibility()">表示/非表示</button>
       </div>
-      
+
       <div class="info-text">
-        <strong>注意:</strong> APIキーは <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> から取得できます。
+        <strong>注意:</strong> APIキーは <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> から無料で取得できます。
       </div>
-      
+
       <button onclick="saveApiSetting()">保存</button>
       <div id="api-status" class="status-message"></div>
     </div>
@@ -579,20 +579,20 @@
 
     // APIキー設定を保存
     function saveApiSetting() {
-      var apiKey = document.getElementById('claude-api-key').value.trim();
-      
+      var apiKey = document.getElementById('gemini-api-key').value.trim();
+
       if (!apiKey) {
         showMessage('api-status', 'APIキーを入力してください', 'error');
         return;
       }
-      
-      if (!apiKey.startsWith('sk-')) {
-        showMessage('api-status', 'APIキーの形式が正しくありません', 'error');
+
+      if (!apiKey.startsWith('AIza')) {
+        showMessage('api-status', 'APIキーの形式が正しくありません（AIzaで始まる必要があります）', 'error');
         return;
       }
-      
+
       showMessage('api-status', 'APIキーを保存中...', 'info');
-      
+
       google.script.run
         .withSuccessHandler(function(result) {
           settings = result;
@@ -601,12 +601,12 @@
         .withFailureHandler(function(error) {
           showMessage('api-status', 'エラー: ' + error, 'error');
         })
-        .saveSettings({claudeApiKey: apiKey});
+        .saveSettings({geminiApiKey: apiKey});
     }
 
     // APIキーの表示/非表示を切り替え
     function toggleApiKeyVisibility() {
-      var apiKeyInput = document.getElementById('claude-api-key');
+      var apiKeyInput = document.getElementById('gemini-api-key');
       if (apiKeyInput.type === 'password') {
         apiKeyInput.type = 'text';
       } else {
@@ -689,7 +689,7 @@
         return;
       }
       
-      if (!settings.email || !settings.claudeApiKey) {
+      if (!settings.email || !settings.geminiApiKey) {
         showMessage('run-status', 'メールアドレスとAPIキーを設定してください', 'error');
         return;
       }
@@ -744,9 +744,9 @@
       if (settings && settings.email) {
         document.getElementById('email').value = settings.email;
       }
-      
-      if (settings && settings.claudeApiKey) {
-        document.getElementById('claude-api-key').value = settings.claudeApiKey;
+
+      if (settings && settings.geminiApiKey) {
+        document.getElementById('gemini-api-key').value = settings.geminiApiKey;
       }
       
       // 現在のトリガー設定を表示

@@ -1,9 +1,9 @@
 /**
- * Pubmed論文自動要約アプリケーション
- * 
+ * Pubmed論文自動要約アプリケーション (Gemini版)
+ *
  * 機能:
  * - PubmedのAPIを使用し、特定の検索用語で週に１回検索を行う
- * - 過去１週間にpublishされた論文のAbstractをClaudeのAPIで要約
+ * - 過去１週間にpublishされた論文のAbstractをGemini 2.0 Flash APIで要約
  * - 結果をスプレッドシートに記録し、メールで送信
  */
 
@@ -16,7 +16,7 @@ const SHEET_NAMES = {
 
 const SETTING_KEYS = {
   EMAIL: 'email',
-  CLAUDE_API_KEY: 'claudeApiKey',
+  GEMINI_API_KEY: 'geminiApiKey',
   MAX_RESULTS_DEFAULT: 'maxResultsDefault'
 };
 
@@ -63,7 +63,7 @@ function initializeSpreadsheet() {
     settingsSheet = ss.insertSheet(SHEET_NAMES.SETTINGS);
     settingsSheet.appendRow(['Key', 'Value']);
     settingsSheet.appendRow([SETTING_KEYS.EMAIL, '']);
-    settingsSheet.appendRow([SETTING_KEYS.CLAUDE_API_KEY, '']);
+    settingsSheet.appendRow([SETTING_KEYS.GEMINI_API_KEY, '']);
     settingsSheet.appendRow([SETTING_KEYS.MAX_RESULTS_DEFAULT, '10']);
     settingsSheet.getRange('A1:B1').setFontWeight('bold');
   }
@@ -439,56 +439,65 @@ function getPublicationDate(article) {
 }
 
 /**
- * ClaudeのAPIを使用してアブストラクトを要約
+ * Gemini 2.0 Flash APIを使用してアブストラクトを要約
  */
-function summarizeWithClaude(abstract) {
+function summarizeWithGemini(abstract) {
   if (!abstract || abstract.trim() === "") {
     return "アブストラクトがありません";
   }
-  
+
   // 設定からAPIキーを取得
   const settings = getSettings();
-  const apiKey = settings[SETTING_KEYS.CLAUDE_API_KEY];
-  
+  const apiKey = settings[SETTING_KEYS.GEMINI_API_KEY];
+
   if (!apiKey || apiKey.trim() === "") {
-    return "Claude APIキーが設定されていません";
+    return "Gemini APIキーが設定されていません";
   }
-  
-  const url = "https://api.anthropic.com/v1/messages";
+
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + apiKey;
   const payload = {
-    model: "claude-3-haiku-20240307",
-    max_tokens: 1000,
-    messages: [
+    contents: [
       {
-        role: "user",
-        content: "以下の医学論文のアブストラクトを100単語以内で簡潔に要約してください：\n\n" + abstract
+        parts: [
+          {
+            text: "以下の医学論文のアブストラクトを100単語以内で簡潔に日本語で要約してください：\n\n" + abstract
+          }
+        ]
       }
-    ]
+    ],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1000
+    }
   };
-  
+
   const options = {
     method: "post",
     contentType: "application/json",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01"
-    },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
-  
+
   try {
     const response = UrlFetchApp.fetch(url, options);
-    
+
     if (response.getResponseCode() !== 200) {
-      Logger.log("Claude API エラー: " + response.getContentText());
+      Logger.log("Gemini API エラー: " + response.getContentText());
       return "要約APIエラー";
     }
-    
+
     const data = JSON.parse(response.getContentText());
-    return data.content[0].text || "要約できませんでした";
+
+    if (data.candidates && data.candidates.length > 0 &&
+        data.candidates[0].content && data.candidates[0].content.parts &&
+        data.candidates[0].content.parts.length > 0) {
+      return data.candidates[0].content.parts[0].text || "要約できませんでした";
+    } else {
+      Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
+      return "要約できませんでした";
+    }
   } catch (e) {
-    Logger.log("Claude API例外: " + e.toString());
+    Logger.log("Gemini API例外: " + e.toString());
     return "要約処理エラー";
   }
 }
@@ -636,12 +645,12 @@ function runSearch() {
   }
   
   // APIキーのチェック
-  if (!settings.claudeApiKey || settings.claudeApiKey.trim() === "") {
-    Logger.log("Claude APIキーが設定されていません");
+  if (!settings.geminiApiKey || settings.geminiApiKey.trim() === "") {
+    Logger.log("Gemini APIキーが設定されていません");
     return {
       success: false,
       count: 0,
-      message: "Claude APIキーが設定されていません。「API設定」タブでAPIキーを設定してください。"
+      message: "Gemini APIキーが設定されていません。「API設定」タブでAPIキーを設定してください。"
     };
   }
   
@@ -679,8 +688,8 @@ function runSearch() {
       
       for (const article of articles) {
         // アブストラクト要約
-        const summary = summarizeWithClaude(article.abstract);
-        
+        const summary = summarizeWithGemini(article.abstract);
+
         // スプレッドシートに記録
         const isNew = recordToSheet(article, searchTerm.term, summary);
         

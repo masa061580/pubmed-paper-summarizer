@@ -3,7 +3,7 @@
  *
  * 機能:
  * - PubmedのAPIを使用し、特定の検索用語で週に１回検索を行う
- * - 過去１週間にpublishされた論文のAbstractをGemini 2.0 Flash APIで要約
+ * - 過去１週間にpublishされた論文のAbstractをGemini 2.5 Flash APIで要約
  * - 結果をスプレッドシートに記録し、メールで送信
  */
 
@@ -439,7 +439,7 @@ function getPublicationDate(article) {
 }
 
 /**
- * Gemini 2.0 Flash APIを使用してアブストラクトを要約
+ * Gemini 2.5 Flash APIを使用してアブストラクトを要約
  */
 function summarizeWithGemini(abstract) {
   if (!abstract || abstract.trim() === "") {
@@ -454,7 +454,7 @@ function summarizeWithGemini(abstract) {
     return "Gemini APIキーが設定されていません";
   }
 
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + apiKey;
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
   const payload = {
     contents: [
       {
@@ -814,5 +814,104 @@ function getCurrentTrigger() {
   } catch (e) {
     Logger.log("トリガー取得エラー: " + e.toString());
     return { exists: false, error: e.toString() };
+  }
+}
+
+/**
+ * Gemini APIを使ってPubMed検索式を生成
+ */
+function generatePubmedQuery(userRequest) {
+  if (!userRequest || userRequest.trim() === "") {
+    return {
+      success: false,
+      message: "検索内容が入力されていません"
+    };
+  }
+
+  // 設定からAPIキーを取得
+  const settings = getSettings();
+  const apiKey = settings[SETTING_KEYS.GEMINI_API_KEY];
+
+  if (!apiKey || apiKey.trim() === "") {
+    return {
+      success: false,
+      message: "Gemini APIキーが設定されていません"
+    };
+  }
+
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+
+  const prompt = `あなたはPubMed検索のエキスパートです。以下のユーザーの要望に基づいて、最適なPubMed検索式を生成してください。
+
+【重要な指示】
+1. MeSH用語（Medical Subject Headings）を積極的に使用してください
+2. 必要に応じてフリーワードも組み合わせてください
+3. AND、OR、NOTなどのブール演算子を適切に使用してください
+4. [MeSH Terms]、[Title/Abstract]、[Author]などのフィールドタグを適切に使用してください
+5. 検索式のみを出力してください（説明文は不要です）
+6. 検索式は1行で出力してください
+
+ユーザーの要望:
+${userRequest}
+
+PubMed検索式:`;
+
+  const payload = {
+    contents: [
+      {
+        parts: [
+          {
+            text: prompt
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 500
+    }
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log("Gemini API エラー: " + response.getContentText());
+      return {
+        success: false,
+        message: "Gemini APIエラー"
+      };
+    }
+
+    const data = JSON.parse(response.getContentText());
+
+    if (data.candidates && data.candidates.length > 0 &&
+        data.candidates[0].content && data.candidates[0].content.parts &&
+        data.candidates[0].content.parts.length > 0) {
+      const generatedQuery = data.candidates[0].content.parts[0].text.trim();
+      return {
+        success: true,
+        query: generatedQuery
+      };
+    } else {
+      Logger.log("Gemini API レスポンス形式エラー: " + JSON.stringify(data));
+      return {
+        success: false,
+        message: "検索式を生成できませんでした"
+      };
+    }
+  } catch (e) {
+    Logger.log("Gemini API例外: " + e.toString());
+    return {
+      success: false,
+      message: "検索式生成エラー: " + e.toString()
+    };
   }
 }

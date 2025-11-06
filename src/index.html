@@ -298,6 +298,7 @@
     <!-- タブメニュー -->
     <div class="tabs">
       <button class="tablink active" onclick="openTab(event, 'search-tab')">検索設定</button>
+      <button class="tablink" onclick="openTab(event, 'query-generator-tab')">検索式生成</button>
       <button class="tablink" onclick="openTab(event, 'email-tab')">メール設定</button>
       <button class="tablink" onclick="openTab(event, 'api-tab')">API設定</button>
       <button class="tablink" onclick="openTab(event, 'schedule-tab')">スケジュール</button>
@@ -324,17 +325,50 @@
         <strong>ヒント:</strong> 複数のキーワードを AND/OR で組み合わせることができます (例: "cancer AND therapy")
       </div>
     </div>
-    
+
+    <!-- 検索式生成タブ -->
+    <div id="query-generator-tab" class="tabcontent">
+      <h2>PubMed検索式生成</h2>
+      <p>AIを使ってMeSH用語とフリーワードを組み合わせた最適なPubMed検索式を生成します。</p>
+
+      <div class="form-group" style="flex-direction: column; align-items: stretch;">
+        <label for="query-request">検索したい内容を自然な言葉で入力してください:</label>
+        <textarea id="query-request" placeholder="例: 乳がんの免疫療法に関する最新の研究" style="min-height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical;"></textarea>
+      </div>
+
+      <button onclick="generateSearchQuery()">検索式を生成</button>
+      <div id="query-generator-status" class="status-message"></div>
+
+      <!-- 生成された検索式の表示 -->
+      <div id="generated-query-container" style="display: none; margin-top: 20px;">
+        <h3 style="color: #336699; font-size: 16px;">生成された検索式:</h3>
+        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; border-left: 4px solid #336699; margin-bottom: 15px;">
+          <pre id="generated-query-text" style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: monospace; font-size: 13px;"></pre>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="copyGeneratedQuery()">検索式をコピー</button>
+          <button onclick="checkQueryInPubmed()" style="background-color: #336699;">PubMedで確認</button>
+          <button onclick="addGeneratedQueryToSearchTerms()" style="background-color: #5cb85c;">検索用語に追加</button>
+        </div>
+      </div>
+    </div>
+
     <!-- メール設定タブ -->
     <div id="email-tab" class="tabcontent">
       <h2>メール設定</h2>
       <p>検索結果を送信するメールアドレスを設定します。</p>
-      
+
+      <!-- 現在のメールアドレス表示 -->
+      <div id="current-email-display" style="display: none; margin-bottom: 15px; padding: 12px; background-color: #f9f9f9; border-radius: 4px; border-left: 4px solid #336699;">
+        <strong>現在のメールアドレス:</strong> <span id="current-email-text"></span>
+        <button onclick="deleteEmailSetting()" style="margin-left: 10px; background-color: #d9534f; padding: 6px 12px; font-size: 13px;">削除</button>
+      </div>
+
       <div class="form-group">
         <label for="email">メールアドレス:</label>
         <input type="email" id="email" placeholder="example@gmail.com" value="">
       </div>
-      
+
       <button onclick="saveEmailSetting()">保存</button>
       <div id="email-status" class="status-message"></div>
     </div>
@@ -415,7 +449,10 @@
     
     <!-- 実行ボタン -->
     <div class="action-buttons">
-      <button class="action" onclick="runSearchNow()">今すぐ検索実行</button>
+      <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+        <button class="action" onclick="runSearchNow()">今すぐメール配信テスト</button>
+        <button class="action" onclick="checkAllSearchTermsInPubmed()" style="background: #5cb85c;">検索式チェック</button>
+      </div>
       <div id="run-status" class="status-message"></div>
     </div>
   </div>
@@ -570,6 +607,7 @@
       google.script.run
         .withSuccessHandler(function(result) {
           settings = result;
+          updateEmailDisplay();
           showMessage('email-status', 'メールアドレスを保存しました', 'success');
         })
         .withFailureHandler(function(error) {
@@ -735,6 +773,140 @@
       }
     }
 
+    // メールアドレスを削除
+    function deleteEmailSetting() {
+      if (!confirm('メールアドレスを削除してもよろしいですか？')) {
+        return;
+      }
+
+      showMessage('email-status', 'メールアドレスを削除中...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          settings = result;
+          document.getElementById('email').value = '';
+          updateEmailDisplay();
+          showMessage('email-status', 'メールアドレスを削除しました', 'success');
+        })
+        .withFailureHandler(function(error) {
+          showMessage('email-status', 'エラー: ' + error, 'error');
+        })
+        .saveSettings({email: ''});
+    }
+
+    // メールアドレス表示を更新
+    function updateEmailDisplay() {
+      var displayDiv = document.getElementById('current-email-display');
+      var textSpan = document.getElementById('current-email-text');
+
+      if (settings && settings.email && settings.email.trim() !== '') {
+        textSpan.textContent = settings.email;
+        displayDiv.style.display = 'block';
+      } else {
+        displayDiv.style.display = 'none';
+      }
+    }
+
+    // 検索式をGeminiで生成
+    function generateSearchQuery() {
+      var queryRequest = document.getElementById('query-request').value.trim();
+
+      if (!queryRequest) {
+        showMessage('query-generator-status', '検索したい内容を入力してください', 'error');
+        return;
+      }
+
+      if (!settings.geminiApiKey || settings.geminiApiKey.trim() === '') {
+        showMessage('query-generator-status', 'Gemini APIキーが設定されていません。API設定タブで設定してください。', 'error');
+        return;
+      }
+
+      showMessage('query-generator-status', '検索式を生成中...しばらくお待ちください', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            document.getElementById('generated-query-text').textContent = result.query;
+            document.getElementById('generated-query-container').style.display = 'block';
+            showMessage('query-generator-status', '検索式を生成しました', 'success');
+          } else {
+            showMessage('query-generator-status', 'エラー: ' + result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('query-generator-status', 'エラー: ' + error, 'error');
+        })
+        .generatePubmedQuery(queryRequest);
+    }
+
+    // 生成された検索式をコピー
+    function copyGeneratedQuery() {
+      var queryText = document.getElementById('generated-query-text').textContent;
+      navigator.clipboard.writeText(queryText).then(function() {
+        showMessage('query-generator-status', 'クリップボードにコピーしました', 'success');
+      }).catch(function(error) {
+        showMessage('query-generator-status', 'コピーに失敗しました: ' + error, 'error');
+      });
+    }
+
+    // 生成された検索式をPubMedで確認
+    function checkQueryInPubmed() {
+      var queryText = document.getElementById('generated-query-text').textContent;
+      var pubmedUrl = 'https://pubmed.ncbi.nlm.nih.gov/?term=' + encodeURIComponent(queryText);
+      window.open(pubmedUrl, '_blank');
+    }
+
+    // 生成された検索式を検索用語に追加
+    function addGeneratedQueryToSearchTerms() {
+      var queryText = document.getElementById('generated-query-text').textContent;
+      var maxResults = 10;
+
+      if (!queryText) {
+        showMessage('query-generator-status', '検索式が生成されていません', 'error');
+        return;
+      }
+
+      showMessage('query-generator-status', '検索用語に追加中...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          searchTerms = result;
+          renderSearchTerms();
+          showMessage('query-generator-status', '検索用語に追加しました', 'success');
+
+          // 検索設定タブに切り替え
+          setTimeout(function() {
+            var event = {currentTarget: document.querySelector('.tablink[onclick*="search-tab"]')};
+            openTab(event, 'search-tab');
+          }, 1000);
+        })
+        .withFailureHandler(function(error) {
+          showMessage('query-generator-status', 'エラー: ' + error, 'error');
+        })
+        .saveSearchTerm(queryText, maxResults);
+    }
+
+    // すべての検索用語をPubMedでチェック
+    function checkAllSearchTermsInPubmed() {
+      if (!searchTerms || searchTerms.length === 0) {
+        showMessage('run-status', '検索用語が設定されていません', 'error');
+        return;
+      }
+
+      // 各検索用語のタブを開く
+      searchTerms.forEach(function(term, index) {
+        if (term && term.term) {
+          var pubmedUrl = 'https://pubmed.ncbi.nlm.nih.gov/?term=' + encodeURIComponent(term.term);
+          // 少し遅延を入れてタブを開く（ブラウザのポップアップブロックを回避）
+          setTimeout(function() {
+            window.open(pubmedUrl, '_blank');
+          }, index * 300);
+        }
+      });
+
+      showMessage('run-status', searchTerms.length + '件の検索式でPubMedを開きました', 'success');
+    }
+
     // デバッグ用関数
     function logSearchTerms() {
       console.log("Current search terms:", JSON.stringify(searchTerms));
@@ -743,10 +915,10 @@
     // 初期化
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Initial search terms:", JSON.stringify(searchTerms));
-      
+
       // 検索用語リストの表示
       renderSearchTerms();
-      
+
       // 設定値の表示
       if (settings && settings.email) {
         document.getElementById('email').value = settings.email;
@@ -755,7 +927,10 @@
       if (settings && settings.geminiApiKey) {
         document.getElementById('gemini-api-key').value = settings.geminiApiKey;
       }
-      
+
+      // メールアドレス表示を更新
+      updateEmailDisplay();
+
       // 現在のトリガー設定を表示
       renderCurrentTrigger();
     });

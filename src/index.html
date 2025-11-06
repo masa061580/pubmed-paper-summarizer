@@ -481,28 +481,61 @@
     function renderSearchTerms() {
       var container = document.getElementById('search-terms-container');
       container.innerHTML = '';
-      
+
       if (!searchTerms || searchTerms.length === 0) {
         container.innerHTML = '<div class="info-text">検索用語が設定されていません。下のフォームから追加してください。</div>';
         return;
       }
-      
+
       console.log("Rendering search terms:", JSON.stringify(searchTerms));
-      
+
       for (var i = 0; i < searchTerms.length; i++) {
         var term = searchTerms[i];
         if (!term) continue; // undefined または null の項目をスキップ
-        
+
         var termValue = term.term || '';
         var maxResultsValue = term.maxResults || 10;
-        
+
         var div = document.createElement('div');
         div.className = 'search-term-item';
-        div.innerHTML = `
-          <input type="text" value="${termValue}" onchange="updateSearchTerm(${i}, this.value, ${maxResultsValue})">
-          <input type="number" value="${maxResultsValue}" min="1" max="100" onchange="updateSearchTerm(${i}, '${termValue}', this.value)">
-          <button onclick="deleteSearchTerm(${i})">削除</button>
-        `;
+        div.dataset.index = i;
+
+        // 検索用語入力欄
+        var termInput = document.createElement('input');
+        termInput.type = 'text';
+        termInput.value = termValue;
+        termInput.className = 'term-input';
+
+        // 最大件数入力欄
+        var maxResultsInput = document.createElement('input');
+        maxResultsInput.type = 'number';
+        maxResultsInput.value = maxResultsValue;
+        maxResultsInput.min = '1';
+        maxResultsInput.max = '100';
+        maxResultsInput.className = 'max-results-input';
+
+        // 削除ボタン
+        var deleteButton = document.createElement('button');
+        deleteButton.textContent = '削除';
+        deleteButton.onclick = function() {
+          var index = parseInt(this.parentElement.dataset.index);
+          deleteSearchTerm(index);
+        };
+
+        // 更新ハンドラ
+        var updateHandler = function() {
+          var index = parseInt(this.parentElement.dataset.index);
+          var termInput = this.parentElement.querySelector('.term-input');
+          var maxResultsInput = this.parentElement.querySelector('.max-results-input');
+          updateSearchTerm(index, termInput.value, maxResultsInput.value);
+        };
+
+        termInput.onchange = updateHandler;
+        maxResultsInput.onchange = updateHandler;
+
+        div.appendChild(termInput);
+        div.appendChild(maxResultsInput);
+        div.appendChild(deleteButton);
         container.appendChild(div);
       }
     }
@@ -931,8 +964,8 @@
       // メールアドレス表示を更新
       updateEmailDisplay();
 
-      // 現在のトリガー設定を表示
-      renderCurrentTrigger();
+      // 現在のトリガー設定を最新状態で取得して表示
+      loadCurrentTrigger();
     });
   </script>
 </body>
